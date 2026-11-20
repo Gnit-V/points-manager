@@ -944,7 +944,7 @@
 
       <div class="modal-field">
         <label for="roomIdInput" class="field-label">共享账本编码</label>
-        <input id="roomIdInput" type="text" class="text-input" placeholder="例如 family-0611" />
+        <input id="roomIdInput" type="text" class="text-input" placeholder="例如 Amy_0813" />
       </div>
 
       <div class="modal-footer">
@@ -996,7 +996,7 @@
       let cloudConfig = {
         url: "",
         key: "",
-        roomId: "family-0611"
+        roomId: "Amy_0813"
       };
 
       let currentFilter = "all";
@@ -1060,7 +1060,7 @@
           const parsed = JSON.parse(raw);
           cloudConfig.url = (parsed.url || "").trim().replace(/\/+$/, "").replace(/\/rest\/v1$/i, "");
           cloudConfig.key = (parsed.key || "").trim();
-          cloudConfig.roomId = (parsed.roomId || "family-0611").trim() || "family-0611";
+          cloudConfig.roomId = (parsed.roomId || "Amy_0813").trim() || "Amy_0813";
         } catch (_) {
           // 保持默认配置
         }
@@ -1432,7 +1432,7 @@
       document.getElementById("openCloudBtn").addEventListener("click", () => {
         sbUrlInput.value = cloudConfig.url;
         sbKeyInput.value = cloudConfig.key;
-        roomIdInput.value = cloudConfig.roomId || "family-0611";
+        roomIdInput.value = cloudConfig.roomId || "Amy_0813";
         cloudModal.classList.add("open");
       });
 
@@ -1447,7 +1447,7 @@
       document.getElementById("saveCloudBtn").addEventListener("click", async () => {
         const url = sbUrlInput.value.trim().replace(/\/+$/, "").replace(/\/rest\/v1$/i, "");
         const key = sbKeyInput.value.trim();
-        const roomId = roomIdInput.value.trim() || "family-0611";
+        const roomId = roomIdInput.value.trim() || "Amy_0813";
 
         if (!url || !key) {
           showToast("请完整填写 Project URL 和 Key");
@@ -1462,11 +1462,11 @@
       });
 
       document.getElementById("clearCloudBtn").addEventListener("click", () => {
-        cloudConfig = { url: "", key: "", roomId: "family-0611" };
+        cloudConfig = { url: "", key: "", roomId: "Amy_0813" };
         saveCloudConfig();
         sbUrlInput.value = "";
         sbKeyInput.value = "";
-        roomIdInput.value = "family-0611";
+        roomIdInput.value = "Amy_0813";
         cloudConnected = false;
         setSyncStatus("local", "未连接云端");
         cloudModal.classList.remove("open");

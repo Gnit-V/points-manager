@@ -733,14 +733,14 @@
         <div>
           <h1 class="brand-title">积分记录与管理</h1>
           <div class="brand-sub">
-            <span id="modeDesc">本地自动保存 · 多端可选云端同步</span>
-            <span id="syncBadge" class="sync-badge">未连接云端</span>
+            <span id="modeDesc">每一分成长清晰可见♡❤♡</span>
+            <span id="syncBadge" class="sync-badge">连接中...</span>
           </div>
         </div>
       </div>
 
       <div class="topbar-actions">
-        <button type="button" id="openCloudBtn" class="btn-secondary">云端同步配置</button>
+        <button type="button" id="openCloudBtn" class="btn-secondary">切换账本/配置</button>
         <button type="button" id="syncNowBtn" class="btn-secondary">立即同步</button>
         <button type="button" id="openResetBtn" class="btn-reset">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
@@ -930,7 +930,7 @@
   <div id="cloudModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="cloudModalTitle">
     <div class="modal-card">
       <h3 id="cloudModalTitle" class="modal-title">Supabase 云端同步配置</h3>
-      <p class="modal-desc">填写同一份 Supabase 项目参数与共享账本编码，即可在多台设备间保持积分与流水一致（留空则仅使用本地存储）。</p>
+      <p class="modal-desc">默认已内置您的项目参数，新设备打开会自动同步。如需要切换其他共享账本，修改下方编码即可。</p>
 
       <div class="modal-field">
         <label for="sbUrlInput" class="field-label">Project URL</label>
@@ -939,7 +939,7 @@
 
       <div class="modal-field">
         <label for="sbKeyInput" class="field-label">Publishable Key / Anon Key</label>
-        <input id="sbKeyInput" type="text" class="text-input" placeholder="粘贴 sb_publishable_... 或 anon key" />
+        <input id="sbKeyInput" type="text" class="text-input" placeholder="粘贴完整 API Key" />
       </div>
 
       <div class="modal-field">
@@ -948,9 +948,9 @@
       </div>
 
       <div class="modal-footer">
-        <button type="button" id="clearCloudBtn" class="btn-secondary">清除云端配置</button>
+        <button type="button" id="resetDefaultBtn" class="btn-secondary">恢复代码默认</button>
         <button type="button" id="cancelCloudBtn" class="btn-secondary">取消</button>
-        <button type="button" id="saveCloudBtn" class="btn-add">保存并连接云端</button>
+        <button type="button" id="saveCloudBtn" class="btn-add">保存并连接</button>
       </div>
     </div>
   </div>
@@ -964,7 +964,16 @@
       const RESET_PASSWORD = "0611";
       const TABLE_NAME = "points_ledger";
 
-      // 内存存储兜底（防止部分无痕/沙箱环境 localStorage 受限）
+      // ==========================================
+      // 👇 默认云端配置区（已为您预填 URL 与编码）
+      // ==========================================
+      const DEFAULT_CLOUD_CONFIG = {
+        url: "https://ujxzwhkvcainlzvvzsfo.supabase.co",
+        key: "这里粘贴你的完整_API_KEY", // <-- 请把引号内的中文替换为完整的密钥字符串
+        roomId: "Amy_0813"
+      };
+      // ==========================================
+
       let memoryDataRaw = null;
       let memoryCloudRaw = null;
 
@@ -982,9 +991,7 @@
         else memoryCloudRaw = val;
         try {
           window.localStorage.setItem(key, val);
-        } catch (_) {
-          // 忽略受限存储错误，依赖内存兜底
-        }
+        } catch (_) {}
       }
 
       let state = {
@@ -993,11 +1000,7 @@
         updatedAt: new Date().toISOString()
       };
 
-      let cloudConfig = {
-        url: "",
-        key: "",
-        roomId: "Amy_0813"
-      };
+      let cloudConfig = { ...DEFAULT_CLOUD_CONFIG };
 
       let currentFilter = "all";
       let cloudConnected = false;
@@ -1043,9 +1046,7 @@
           state.totalPoints = Number(parsed.totalPoints) || 0;
           state.history = Array.isArray(parsed.history) ? parsed.history : [];
           state.updatedAt = parsed.updatedAt || new Date().toISOString();
-        } catch (_) {
-          // 保持默认状态
-        }
+        } catch (_) {}
       }
 
       function saveLocalState() {
@@ -1055,15 +1056,19 @@
 
       function loadCloudConfig() {
         const raw = readStorage(STORAGE_CLOUD_KEY, memoryCloudRaw);
-        if (!raw) return;
-        try {
-          const parsed = JSON.parse(raw);
-          cloudConfig.url = (parsed.url || "").trim().replace(/\/+$/, "").replace(/\/rest\/v1$/i, "");
-          cloudConfig.key = (parsed.key || "").trim();
-          cloudConfig.roomId = (parsed.roomId || "Amy_0813").trim() || "Amy_0813";
-        } catch (_) {
-          // 保持默认配置
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            if (parsed.url && parsed.key && !parsed.key.includes("这里粘贴")) {
+              cloudConfig.url = parsed.url.trim().replace(/\/+$/, "").replace(/\/rest\/v1$/i, "");
+              cloudConfig.key = parsed.key.trim();
+              cloudConfig.roomId = (parsed.roomId || DEFAULT_CLOUD_CONFIG.roomId).trim();
+              return;
+            }
+          } catch (_) {}
         }
+        // 如果本地缓存没有有效的配置，直接使用代码里写死的默认配置
+        cloudConfig = { ...DEFAULT_CLOUD_CONFIG };
       }
 
       function saveCloudConfig() {
@@ -1071,19 +1076,24 @@
       }
 
       function hasCloudConfig() {
-        return Boolean(cloudConfig.url && cloudConfig.key && cloudConfig.roomId);
+        return Boolean(
+          cloudConfig.url &&
+          cloudConfig.key &&
+          !cloudConfig.key.includes("这里粘贴") &&
+          cloudConfig.roomId
+        );
       }
 
       function setSyncStatus(status, label) {
         syncBadge.className = "sync-badge";
         if (status === "connected") {
           syncBadge.classList.add("connected");
-          modeDesc.textContent = "云端实时同步中 · 账本：" + cloudConfig.roomId;
+          modeDesc.textContent = "云端同步中 · 账本：" + cloudConfig.roomId;
         } else if (status === "error") {
           syncBadge.classList.add("error");
-          modeDesc.textContent = "云端同步异常 · 已保存至本地";
+          modeDesc.textContent = "云端同步异常 · 已暂存至本地";
         } else {
-          modeDesc.textContent = "本地自动保存 · 可点击右上角连接云端";
+          modeDesc.textContent = "本地自动保存 · 未配置有效云端密钥";
         }
         syncBadge.textContent = label;
       }
@@ -1183,7 +1193,6 @@
           .replace(/'/g, "&#39;");
       }
 
-      // Supabase REST 读写
       function buildHeaders() {
         return {
           "Content-Type": "application/json",
@@ -1196,7 +1205,7 @@
       async function pullFromCloud(silent) {
         if (!hasCloudConfig()) {
           cloudConnected = false;
-          setSyncStatus("local", "未连接云端");
+          setSyncStatus("local", "未填入有效 Key");
           return false;
         }
         try {
@@ -1224,15 +1233,14 @@
               renderAll(false);
             }
           } else {
-            // 云端尚无该账本记录时，将当前本地状态初始化上传
             await pushToCloud(true);
           }
           return true;
         } catch (err) {
           cloudConnected = false;
-          setSyncStatus("error", "云端同步失败");
+          setSyncStatus("error", "云端连接失败");
           if (!silent) {
-            showToast("云端连接失败，请检查 URL、Key 与数据表权限");
+            showToast("连接失败：请确认代码中的 API Key 已完整填入且表权限已放行");
           }
           return false;
         }
@@ -1364,11 +1372,9 @@
         syncTierActive(Number(pointsInput.value));
       });
 
-      // 增加 / 扣减积分按钮
       document.getElementById("addPointsBtn").addEventListener("click", () => handleRecord("add"));
       document.getElementById("subPointsBtn").addEventListener("click", () => handleRecord("sub"));
 
-      // 历史流水筛选与撤销
       const filterButtons = Array.from(document.querySelectorAll(".filter-btn"));
       filterButtons.forEach((btn) => {
         btn.addEventListener("click", () => {
@@ -1385,7 +1391,7 @@
         if (id) handleUndo(id);
       });
 
-      // 重置积分弹窗（密码 0611 二次确认）
+      // 重置积分弹窗
       document.getElementById("openResetBtn").addEventListener("click", () => {
         resetPasswordInput.value = "";
         resetModal.classList.add("open");
@@ -1428,11 +1434,11 @@
         if (e.key === "Enter") confirmResetPoints();
       });
 
-      // 云端同步配置弹窗
+      // 云端配置弹窗
       document.getElementById("openCloudBtn").addEventListener("click", () => {
         sbUrlInput.value = cloudConfig.url;
-        sbKeyInput.value = cloudConfig.key;
-        roomIdInput.value = cloudConfig.roomId || "Amy_0813";
+        sbKeyInput.value = cloudConfig.key.includes("这里粘贴") ? "" : cloudConfig.key;
+        roomIdInput.value = cloudConfig.roomId || DEFAULT_CLOUD_CONFIG.roomId;
         cloudModal.classList.add("open");
       });
 
@@ -1447,7 +1453,7 @@
       document.getElementById("saveCloudBtn").addEventListener("click", async () => {
         const url = sbUrlInput.value.trim().replace(/\/+$/, "").replace(/\/rest\/v1$/i, "");
         const key = sbKeyInput.value.trim();
-        const roomId = roomIdInput.value.trim() || "Amy_0813";
+        const roomId = roomIdInput.value.trim() || DEFAULT_CLOUD_CONFIG.roomId;
 
         if (!url || !key) {
           showToast("请完整填写 Project URL 和 Key");
@@ -1461,21 +1467,20 @@
         await pullFromCloud(false);
       });
 
-      document.getElementById("clearCloudBtn").addEventListener("click", () => {
-        cloudConfig = { url: "", key: "", roomId: "Amy_0813" };
+      document.getElementById("resetDefaultBtn").addEventListener("click", async () => {
+        cloudConfig = { ...DEFAULT_CLOUD_CONFIG };
         saveCloudConfig();
-        sbUrlInput.value = "";
-        sbKeyInput.value = "";
-        roomIdInput.value = "Amy_0813";
-        cloudConnected = false;
-        setSyncStatus("local", "未连接云端");
+        sbUrlInput.value = cloudConfig.url;
+        sbKeyInput.value = cloudConfig.key.includes("这里粘贴") ? "" : cloudConfig.key;
+        roomIdInput.value = cloudConfig.roomId;
         cloudModal.classList.remove("open");
-        showToast("已切换为纯本地存储模式");
+        showToast("已恢复代码默认配置并尝试同步...");
+        await pullFromCloud(false);
       });
 
       document.getElementById("syncNowBtn").addEventListener("click", async () => {
         if (!hasCloudConfig()) {
-          showToast("尚未配置云端，当前为本地存储模式");
+          showToast("尚未配置有效云端密钥，请检查配置");
           return;
         }
         showToast("正在同步云端数据...");
@@ -1495,7 +1500,7 @@
           }
         }, 15000);
       } else {
-        setSyncStatus("local", "未连接云端");
+        setSyncStatus("local", "未填入有效 Key");
       }
 
       window.addEventListener("beforeunload", () => {

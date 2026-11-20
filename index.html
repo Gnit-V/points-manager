@@ -1,0 +1,1874 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="color-scheme" content="light">
+    <meta name="theme-color" content="#F0F6FF">
+    <title>积分记录与管理系统</title>
+    <style>
+        /* ==========================================================================
+           1. 基础重置与色彩变量（强制浅色高对比度方案，零外部依赖）
+           ========================================================================== */
+        :root {
+            color-scheme: light;
+            --bg-page: #F0F6FF;
+            --bg-card: #FFFFFF;
+            --bg-subtle: #F8FAFC;
+            --bg-input: #F1F5F9;
+            --text-primary: #0F172A;
+            --text-secondary: #475569;
+            --text-muted: #94A3B8;
+            --border-light: #E2E8F0;
+            --border-blue: #DBEAFE;
+
+            --brand-blue: #2563EB;
+            --brand-blue-dark: #1D4ED8;
+            --brand-sky: #0EA5E9;
+
+            --emerald: #10B981;
+            --emerald-dark: #059669;
+            --emerald-bg: #ECFDF5;
+            --emerald-border: #A7F3D0;
+
+            --amber: #F59E0B;
+            --amber-dark: #D97706;
+            --amber-bg: #FFFBEB;
+            --amber-border: #FDE68A;
+
+            --red: #EF4444;
+            --red-dark: #DC2626;
+            --red-bg: #FEF2F2;
+            --red-border: #FECACA;
+
+            --shadow-card: 0 10px 25px -5px rgba(30, 58, 138, 0.06), 0 4px 10px -3px rgba(30, 58, 138, 0.04);
+            --shadow-hero: 0 18px 35px -10px rgba(37, 99, 235, 0.28);
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            width: 100%;
+            min-height: 100vh;
+            background-color: var(--bg-page) !important;
+            color: var(--text-primary) !important;
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+
+        button, input {
+            font-family: inherit;
+            outline: none;
+        }
+
+        button {
+            cursor: pointer;
+            border: none;
+            background: none;
+            user-select: none;
+        }
+
+        /* 隐藏数字输入框默认上下箭头 */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+
+        /* ==========================================================================
+           2. 动画关键帧
+           ========================================================================== */
+        @keyframes popScale {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.09); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes shakeBox {
+            10%, 90% { transform: translate3d(-2px, 0, 0); }
+            20%, 80% { transform: translate3d(4px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
+            40%, 60% { transform: translate3d(6px, 0, 0); }
+        }
+
+        @keyframes slideDown {
+            0% { opacity: 0; transform: translateY(-10px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        .anim-pop {
+            animation: popScale 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .anim-shake {
+            animation: shakeBox 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+        }
+
+        .anim-slide {
+            animation: slideDown 0.24s ease-out forwards;
+        }
+
+        /* ==========================================================================
+           3. 全局轻提示 Toast
+           ========================================================================== */
+        .toast-container {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            left: 16px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        .toast-item {
+            pointer-events: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            max-width: 100%;
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-size: 14px;
+            font-weight: 700;
+            color: #FFFFFF;
+            box-shadow: 0 10px 25px rgba(15, 23, 42, 0.18);
+            transition: opacity 0.28s ease, transform 0.28s ease;
+        }
+
+        .toast-success { background-color: var(--emerald); }
+        .toast-warning { background-color: var(--amber); }
+        .toast-error { background-color: var(--red); }
+        .toast-info { background-color: var(--brand-blue); }
+
+        /* ==========================================================================
+           4. 主体容器与顶部导航
+           ========================================================================== */
+        .app-container {
+            max-width: 1060px;
+            margin: 0 auto;
+            padding: 20px 16px 40px;
+        }
+
+        @media (min-width: 640px) {
+            .app-container {
+                padding: 32px 24px 48px;
+            }
+        }
+
+        .app-header {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+
+        .brand-box {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-logo {
+            width: 46px;
+            height: 46px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, var(--brand-blue), var(--brand-sky));
+            color: #FFFFFF;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 18px rgba(37, 99, 235, 0.26);
+            flex-shrink: 0;
+        }
+
+        .brand-title {
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--text-primary);
+            letter-spacing: -0.02em;
+            line-height: 1.25;
+        }
+
+        @media (min-width: 640px) {
+            .brand-title { font-size: 26px; }
+        }
+
+        .brand-subtitle {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .btn-reset-top {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            padding: 11px 18px;
+            border-radius: 16px;
+            background-color: var(--red);
+            color: #FFFFFF;
+            font-size: 14px;
+            font-weight: 700;
+            box-shadow: 0 8px 20px rgba(239, 68, 68, 0.28);
+            transition: transform 0.15s ease, background-color 0.15s ease;
+        }
+
+        .btn-reset-top:hover { background-color: var(--red-dark); }
+        .btn-reset-top:active { transform: scale(0.96); }
+
+        /* ==========================================================================
+           5. 积分概览看板（钴蓝渐变 Hero 卡片）
+           ========================================================================== */
+        .hero-card {
+            position: relative;
+            overflow: hidden;
+            border-radius: 24px;
+            background: linear-gradient(125deg, #2563EB 0%, #1D4ED8 52%, #0EA5E9 100%);
+            color: #FFFFFF;
+            padding: 24px 20px;
+            box-shadow: var(--shadow-hero);
+            margin-bottom: 24px;
+        }
+
+        @media (min-width: 640px) {
+            .hero-card {
+                padding: 32px;
+                border-radius: 28px;
+                margin-bottom: 28px;
+            }
+        }
+
+        .hero-glow-1 {
+            position: absolute;
+            right: -45px;
+            top: -45px;
+            width: 210px;
+            height: 210px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.12);
+            pointer-events: none;
+        }
+
+        .hero-glow-2 {
+            position: absolute;
+            right: 90px;
+            bottom: -65px;
+            width: 170px;
+            height: 170px;
+            border-radius: 50%;
+            background: rgba(125, 211, 252, 0.2);
+            pointer-events: none;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        @media (min-width: 768px) {
+            .hero-content {
+                flex-direction: row;
+                align-items: center;
+                justify-content: space-between;
+            }
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 13px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.16);
+            font-size: 12px;
+            font-weight: 600;
+            color: #EFF6FF;
+            margin-bottom: 10px;
+        }
+
+        .hero-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #34D399;
+            box-shadow: 0 0 8px #34D399;
+        }
+
+        .hero-score-row {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+        }
+
+        .hero-score-num {
+            font-size: 48px;
+            font-weight: 800;
+            line-height: 1.05;
+            letter-spacing: -0.03em;
+            font-variant-numeric: tabular-nums;
+            color: #FFFFFF;
+        }
+
+        @media (min-width: 640px) {
+            .hero-score-num { font-size: 60px; }
+        }
+
+        .hero-score-unit {
+            font-size: 18px;
+            font-weight: 700;
+            color: #DBEAFE;
+        }
+
+        .hero-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        @media (min-width: 768px) {
+            .hero-stats-grid {
+                min-width: 320px;
+                gap: 16px;
+            }
+        }
+
+        .hero-stat-box {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.24);
+            border-radius: 18px;
+            padding: 14px 16px;
+        }
+
+        .hero-stat-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .label-gain { color: #A7F3D0; }
+        .label-loss { color: #FECACA; }
+
+        .hero-stat-val {
+            font-size: 24px;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+            color: #FFFFFF;
+            line-height: 1.2;
+        }
+
+        @media (min-width: 640px) {
+            .hero-stat-val { font-size: 28px; }
+        }
+
+        /* ==========================================================================
+           6. 主体双栏网格布局
+           ========================================================================== */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 22px;
+            align-items: start;
+        }
+
+        @media (min-width: 960px) {
+            .main-grid {
+                grid-template-columns: 5fr 7fr;
+                gap: 26px;
+            }
+        }
+
+        .panel-card {
+            background-color: var(--bg-card);
+            border-radius: 24px;
+            padding: 22px 18px;
+            border: 1px solid var(--border-blue);
+            box-shadow: var(--shadow-card);
+        }
+
+        @media (min-width: 640px) {
+            .panel-card {
+                padding: 26px;
+                border-radius: 26px;
+            }
+        }
+
+        .panel-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-bottom: 18px;
+        }
+
+        .title-bar {
+            width: 5px;
+            height: 20px;
+            border-radius: 999px;
+            flex-shrink: 0;
+        }
+
+        .bar-blue { background-color: var(--brand-blue); }
+        .bar-sky { background-color: var(--brand-sky); }
+
+        /* ==========================================================================
+           7. 左侧：事件描述与快捷标签
+           ========================================================================== */
+        .form-group {
+            margin-bottom: 22px;
+        }
+
+        .form-label-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 700;
+            color: #334155;
+        }
+
+        .form-hint {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .text-input {
+            width: 100%;
+            height: 46px;
+            padding: 0 38px 0 14px;
+            border-radius: 14px;
+            border: 2px solid var(--border-light);
+            background-color: var(--bg-subtle);
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            transition: border-color 0.15s ease, background-color 0.15s ease;
+        }
+
+        .text-input:focus {
+            background-color: #FFFFFF;
+            border-color: var(--brand-blue);
+        }
+
+        .text-input::placeholder {
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        .btn-clear-input {
+            position: absolute;
+            right: 10px;
+            width: 26px;
+            height: 26px;
+            border-radius: 8px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+        }
+
+        .btn-clear-input.visible {
+            display: flex;
+        }
+
+        .btn-clear-input:hover {
+            background-color: #E2E8F0;
+            color: var(--text-secondary);
+        }
+
+        .preset-sections {
+            margin-top: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .preset-group-title {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 7px;
+        }
+
+        .preset-group-title.good { color: var(--emerald-dark); }
+        .preset-group-title.bad { color: var(--amber-dark); }
+
+        .preset-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+        .preset-dot.good { background-color: var(--emerald); }
+        .preset-dot.bad { background-color: var(--amber); }
+
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        .preset-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            height: 38px;
+            padding: 0 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 700;
+            border: 1.5px solid transparent;
+            transition: all 0.15s ease;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        .preset-btn:active {
+            transform: scale(0.95);
+        }
+
+        .preset-btn span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* 正向好习惯默认与激活态 */
+        .preset-btn.good {
+            background-color: var(--emerald-bg);
+            color: var(--emerald-dark);
+            border-color: var(--emerald-border);
+        }
+        .preset-btn.good svg { color: var(--emerald); }
+        .preset-btn.good.active {
+            background-color: var(--emerald);
+            color: #FFFFFF;
+            border-color: var(--emerald);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.28);
+        }
+        .preset-btn.good.active svg { color: #FFFFFF; }
+
+        /* 负向待改进默认与激活态 */
+        .preset-btn.bad {
+            background-color: var(--amber-bg);
+            color: var(--amber-dark);
+            border-color: var(--amber-border);
+        }
+        .preset-btn.bad svg { color: var(--amber); }
+        .preset-btn.bad.active {
+            background-color: var(--amber);
+            color: #FFFFFF;
+            border-color: var(--amber);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.28);
+        }
+        .preset-btn.bad.active svg { color: #FFFFFF; }
+
+        /* ==========================================================================
+           8. 左侧：积分档位与手动输入
+           ========================================================================== */
+        .quick-points-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .quick-point-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 12px 6px;
+            border-radius: 16px;
+            border: 2px solid var(--border-light);
+            background-color: #FFFFFF;
+            transition: all 0.15s ease;
+        }
+
+        .quick-point-btn:active {
+            transform: scale(0.96);
+        }
+
+        .quick-point-btn .qp-main {
+            font-size: 18px;
+            font-weight: 800;
+            color: #334155;
+            line-height: 1.2;
+        }
+
+        .quick-point-btn .qp-sub {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .quick-point-btn.active {
+            border-color: var(--brand-blue);
+            background-color: #EFF6FF;
+        }
+
+        .quick-point-btn.active .qp-main,
+        .quick-point-btn.active .qp-sub {
+            color: var(--brand-blue);
+        }
+
+        .number-input-box {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .number-prefix {
+            position: absolute;
+            left: 14px;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-muted);
+            pointer-events: none;
+        }
+
+        .number-suffix {
+            position: absolute;
+            right: 14px;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-muted);
+            pointer-events: none;
+        }
+
+        .number-input {
+            width: 100%;
+            height: 48px;
+            padding: 0 50px 0 92px;
+            border-radius: 14px;
+            border: 2px solid var(--border-light);
+            background-color: var(--bg-subtle);
+            font-size: 17px;
+            font-weight: 800;
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums;
+            transition: border-color 0.15s ease, background-color 0.15s ease;
+        }
+
+        .number-input:focus {
+            background-color: #FFFFFF;
+            border-color: var(--brand-blue);
+        }
+
+        /* ==========================================================================
+           9. 主操作按钮：【增加积分】 & 【扣减积分】
+           ========================================================================== */
+        .action-btn-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 6px;
+        }
+
+        .btn-action {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            height: 50px;
+            padding: 0 14px;
+            border-radius: 16px;
+            font-size: 15px;
+            font-weight: 800;
+            color: #FFFFFF;
+            transition: transform 0.15s ease, background-color 0.15s ease;
+        }
+
+        .btn-action:active {
+            transform: scale(0.96);
+        }
+
+        .btn-add {
+            background-color: var(--emerald);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.28);
+        }
+        .btn-add:hover { background-color: var(--emerald-dark); }
+
+        .btn-deduct {
+            background-color: var(--red);
+            box-shadow: 0 8px 20px rgba(239, 68, 68, 0.28);
+        }
+        .btn-deduct:hover { background-color: var(--red-dark); }
+
+        /* ==========================================================================
+           10. 右侧：操作历史流水
+           ========================================================================== */
+        .history-header {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #F1F5F9;
+        }
+
+        .history-title-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .history-title-wrap .panel-title {
+            margin-bottom: 0;
+        }
+
+        .count-badge {
+            padding: 3px 10px;
+            border-radius: 999px;
+            background-color: #EFF6FF;
+            color: var(--brand-blue);
+            border: 1px solid var(--border-blue);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .filter-tabs {
+            display: inline-flex;
+            padding: 4px;
+            border-radius: 12px;
+            background-color: #F1F5F9;
+            gap: 2px;
+        }
+
+        .filter-tab {
+            padding: 6px 12px;
+            border-radius: 9px;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            transition: all 0.15s ease;
+        }
+
+        .filter-tab.active {
+            background-color: #FFFFFF;
+            color: var(--brand-blue);
+            box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+        }
+
+        .history-list {
+            margin-top: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 540px;
+            overflow-y: auto;
+            padding-right: 2px;
+        }
+
+        .history-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px;
+            border-radius: 16px;
+            background-color: var(--bg-subtle);
+            border: 1px solid #F1F5F9;
+            transition: background-color 0.15s ease, border-color 0.15s ease;
+        }
+
+        .history-item:hover {
+            background-color: #F8FAFC;
+            border-color: var(--border-blue);
+        }
+
+        .history-left {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .type-pill {
+            flex-shrink: 0;
+            padding: 4px 10px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 800;
+            border: 1px solid transparent;
+            margin-top: 1px;
+        }
+
+        .type-pill.add {
+            background-color: var(--emerald-bg);
+            color: var(--emerald);
+            border-color: var(--emerald-border);
+        }
+
+        .type-pill.deduct {
+            background-color: var(--red-bg);
+            color: var(--red);
+            border-color: var(--red-border);
+        }
+
+        .history-info {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .history-event {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+            word-break: break-word;
+        }
+
+        .history-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 12px;
+            margin-top: 4px;
+            font-size: 12px;
+            color: var(--text-muted);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .history-meta strong {
+            color: var(--text-secondary);
+            font-weight: 700;
+        }
+
+        .history-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .history-delta {
+            font-size: 16px;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .history-delta.add { color: var(--emerald); }
+        .history-delta.deduct { color: var(--red); }
+
+        .history-delta small {
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .btn-undo {
+            padding: 6px 10px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-muted);
+            background-color: #FFFFFF;
+            border: 1px solid var(--border-light);
+            transition: all 0.15s ease;
+        }
+
+        .btn-undo:hover {
+            color: var(--red);
+            background-color: var(--red-bg);
+            border-color: var(--red-border);
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 56px 16px;
+            text-align: center;
+        }
+
+        .empty-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 18px;
+            background-color: #EFF6FF;
+            color: #93C5FD;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 12px;
+        }
+
+        .empty-text {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        /* ==========================================================================
+           11. 二次确认重置弹窗
+           ========================================================================== */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 9000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            background-color: rgba(15, 23, 42, 0.55);
+        }
+
+        .modal-backdrop.open {
+            display: flex;
+        }
+
+        .modal-card {
+            width: 100%;
+            max-width: 400px;
+            background-color: #FFFFFF;
+            border-radius: 26px;
+            padding: 24px;
+            box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35);
+            border: 1px solid var(--border-light);
+        }
+
+        .modal-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px;
+        }
+
+        .modal-warn-icon {
+            width: 46px;
+            height: 46px;
+            border-radius: 15px;
+            background-color: var(--red-bg);
+            color: var(--red);
+            border: 1px solid var(--red-border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-modal-close {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+        }
+
+        .btn-modal-close:hover {
+            background-color: #F1F5F9;
+            color: var(--text-secondary);
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .modal-desc {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 18px;
+        }
+
+        .modal-desc strong {
+            color: var(--red);
+            font-weight: 700;
+        }
+
+        .pwd-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .pwd-input {
+            width: 100%;
+            height: 48px;
+            padding: 0 16px;
+            border-radius: 14px;
+            border: 2px solid var(--border-light);
+            background-color: var(--bg-subtle);
+            text-align: center;
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: 0.35em;
+            color: var(--text-primary);
+            transition: border-color 0.15s ease, background-color 0.15s ease;
+        }
+
+        .pwd-input:focus {
+            background-color: #FFFFFF;
+            border-color: var(--red);
+        }
+
+        .pwd-input.error {
+            border-color: var(--red);
+            background-color: var(--red-bg);
+        }
+
+        .pwd-error-tip {
+            display: none;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--red);
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        .pwd-error-tip.visible {
+            display: block;
+        }
+
+        .modal-actions {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 22px;
+        }
+
+        .btn-modal-cancel {
+            height: 44px;
+            border-radius: 13px;
+            border: 2px solid var(--border-light);
+            background-color: #FFFFFF;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .btn-modal-confirm {
+            height: 44px;
+            border-radius: 13px;
+            background-color: var(--red);
+            color: #FFFFFF;
+            font-size: 14px;
+            font-weight: 700;
+            box-shadow: 0 6px 16px rgba(239, 68, 68, 0.28);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 顶部全局轻提示容器 -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <div class="app-container">
+        <!-- 顶部导航栏 -->
+        <header class="app-header">
+            <div class="brand-box">
+                <div class="brand-logo" aria-hidden="true">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="9"></circle>
+                        <path d="M14.5 9.5a2.5 2.5 0 0 0-5 0c0 2.5 5 2 5 4.5a2.5 2.5 0 0 1-5 0"></path>
+                        <line x1="12" y1="6.5" x2="12" y2="17.5"></line>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="brand-title">积分记录与管理</h1>
+                    <p class="brand-subtitle">离线独立版 · 本地自动保存 · 每一分成长清晰可见</p>
+                </div>
+            </div>
+
+            <button type="button" id="openResetModalBtn" class="btn-reset-top">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+                <span>重置所有积分</span>
+            </button>
+        </header>
+
+        <!-- 总积分概览看板 -->
+        <section class="hero-card">
+            <div class="hero-glow-1"></div>
+            <div class="hero-glow-2"></div>
+
+            <div class="hero-content">
+                <div>
+                    <div class="hero-badge">
+                        <span class="hero-dot"></span>
+                        <span>当前账户总积分</span>
+                    </div>
+                    <div class="hero-score-row">
+                        <span id="totalPointsDisplay" class="hero-score-num">0</span>
+                        <span class="hero-score-unit">积分</span>
+                    </div>
+                </div>
+
+                <div class="hero-stats-grid">
+                    <div class="hero-stat-box">
+                        <div class="hero-stat-label label-gain">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                                <polyline points="17 6 23 6 23 12"></polyline>
+                            </svg>
+                            <span>今日获得积分</span>
+                        </div>
+                        <div id="todayAddedDisplay" class="hero-stat-val">+0</div>
+                    </div>
+
+                    <div class="hero-stat-box">
+                        <div class="hero-stat-label label-loss">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>
+                                <polyline points="17 18 23 18 23 12"></polyline>
+                            </svg>
+                            <span>今日扣减积分</span>
+                        </div>
+                        <div id="todayDeductedDisplay" class="hero-stat-val">-0</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 主体双栏布局 -->
+        <div class="main-grid">
+            <!-- 左侧：事件与积分录入区 -->
+            <section class="panel-card">
+                <h2 class="panel-title">
+                    <span class="title-bar bar-blue"></span>
+                    <span>事件与积分录入</span>
+                </h2>
+
+                <!-- 1. 事件名称与一键填充标签 -->
+                <div class="form-group">
+                    <label for="eventInput" class="form-label" style="margin-bottom: 8px;">事件描述</label>
+                    <div class="input-wrapper">
+                        <input type="text" id="eventInput" class="text-input" placeholder="输入事件名称，或点击下方快捷标签">
+                        <button type="button" id="clearEventBtn" class="btn-clear-input" title="清空事件名称">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="preset-sections">
+                        <!-- 3个正向好习惯 -->
+                        <div>
+                            <div class="preset-group-title good">
+                                <span class="preset-dot good"></span>
+                                <span>正向好习惯（加分推荐）</span>
+                            </div>
+                            <div class="preset-grid">
+                                <button type="button" class="preset-btn good" data-event="完成任务" data-sentiment="good">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                    </svg>
+                                    <span>完成任务</span>
+                                </button>
+
+                                <button type="button" class="preset-btn good" data-event="运动锻炼" data-sentiment="good">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                                    </svg>
+                                    <span>运动锻炼</span>
+                                </button>
+
+                                <button type="button" class="preset-btn good" data-event="课外阅读" data-sentiment="good">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                                    </svg>
+                                    <span>课外阅读</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 3个负向待改进事件 -->
+                        <div>
+                            <div class="preset-group-title bad">
+                                <span class="preset-dot bad"></span>
+                                <span>负向待改进（扣分提醒）</span>
+                            </div>
+                            <div class="preset-grid">
+                                <button type="button" class="preset-btn bad" data-event="熬夜晚睡" data-sentiment="bad">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                                    </svg>
+                                    <span>熬夜晚睡</span>
+                                </button>
+
+                                <button type="button" class="preset-btn bad" data-event="未按时完成" data-sentiment="bad">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <polyline points="12 6 12 12 16 14"></polyline>
+                                    </svg>
+                                    <span>未按时完成</span>
+                                </button>
+
+                                <button type="button" class="preset-btn bad" data-event="坐姿不好" data-sentiment="bad">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                    </svg>
+                                    <span>坐姿不好</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. 快捷积分档位（5积分、10积分、20积分）与手动输入 -->
+                <div class="form-group">
+                    <div class="form-label-row">
+                        <label for="pointsInput" class="form-label">选择或输入积分分值</label>
+                        <span class="form-hint">快捷点选或手输正整数</span>
+                    </div>
+
+                    <div class="quick-points-grid" id="quickPointsGroup">
+                        <button type="button" class="quick-point-btn" data-points="5">
+                            <span class="qp-main">5</span>
+                            <span class="qp-sub">5 积分</span>
+                        </button>
+                        <button type="button" class="quick-point-btn active" data-points="10">
+                            <span class="qp-main">10</span>
+                            <span class="qp-sub">10 积分</span>
+                        </button>
+                        <button type="button" class="quick-point-btn" data-points="20">
+                            <span class="qp-main">20</span>
+                            <span class="qp-sub">20 积分</span>
+                        </button>
+                    </div>
+
+                    <div class="number-input-box">
+                        <span class="number-prefix">自定义分值：</span>
+                        <input type="number" id="pointsInput" class="number-input" value="10" min="1" max="999999" step="1" inputmode="numeric" placeholder="正整数">
+                        <span class="number-suffix">积分</span>
+                    </div>
+                </div>
+
+                <!-- 3. 主操作按钮：【增加积分】 & 【扣减积分】 -->
+                <div class="action-btn-grid">
+                    <button type="button" id="addPointsBtn" class="btn-action btn-add">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        <span>增加积分</span>
+                    </button>
+
+                    <button type="button" id="deductPointsBtn" class="btn-action btn-deduct">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        <span>扣减积分</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- 右侧：操作历史流水 -->
+            <section class="panel-card">
+                <div class="history-header">
+                    <div class="history-title-wrap">
+                        <h2 class="panel-title">
+                            <span class="title-bar bar-sky"></span>
+                            <span>操作历史流水</span>
+                        </h2>
+                        <span id="recordCountBadge" class="count-badge">0 条</span>
+                    </div>
+
+                    <div class="filter-tabs" id="filterTabsGroup">
+                        <button type="button" class="filter-tab active" data-filter="all">全部记录</button>
+                        <button type="button" class="filter-tab" data-filter="add">仅看增加</button>
+                        <button type="button" class="filter-tab" data-filter="deduct">仅看扣减</button>
+                    </div>
+                </div>
+
+                <div id="historyListContainer" class="history-list">
+                    <!-- 动态渲染流水记录 -->
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- 重置所有积分二次确认模态框（密码：0611） -->
+    <div id="resetModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="resetModalTitle">
+        <div id="resetModalBox" class="modal-card">
+            <div class="modal-top">
+                <div class="modal-warn-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                </div>
+                <button type="button" id="closeResetModalIconBtn" class="btn-modal-close" aria-label="关闭弹窗">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <h3 id="resetModalTitle" class="modal-title">确认重置所有积分？</h3>
+            <p class="modal-desc">
+                此操作将<strong>立即清零当前总积分并清空所有历史记录</strong>，操作不可恢复。请输入重置验证密码进行二次确认。
+            </p>
+
+            <form id="resetConfirmForm">
+                <label for="resetPasswordInput" class="pwd-label">输入安全密码</label>
+                <input type="password" id="resetPasswordInput" class="pwd-input" maxlength="10" inputmode="numeric" placeholder="请输入密码" autocomplete="off">
+                <p id="resetErrorMsg" class="pwd-error-tip">密码错误，请输入正确的验证密码！</p>
+
+                <div class="modal-actions">
+                    <button type="button" id="cancelResetBtn" class="btn-modal-cancel">取消操作</button>
+                    <button type="submit" class="btn-modal-confirm">确认清零重置</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            'use strict';
+
+            // 存储键名与安全密码常量
+            const STORAGE_KEY = 'offline_points_tracker_v1';
+            const RESET_PASSWORD = '0611';
+
+            // 内存兜底存储（防止部分极严格沙箱禁用 localStorage 时崩溃）
+            let memoryFallbackData = null;
+
+            // 应用全局状态
+            let appState = {
+                totalPoints: 0,
+                history: [],
+                currentFilter: 'all' // 'all' | 'add' | 'deduct'
+            };
+
+            // DOM 引用缓存
+            const dom = {};
+
+            /**
+             * 缓存页面 DOM 元素引用
+             */
+            function cacheDOM() {
+                dom.toastContainer = document.getElementById('toastContainer');
+                dom.openResetModalBtn = document.getElementById('openResetModalBtn');
+                dom.totalPointsDisplay = document.getElementById('totalPointsDisplay');
+                dom.todayAddedDisplay = document.getElementById('todayAddedDisplay');
+                dom.todayDeductedDisplay = document.getElementById('todayDeductedDisplay');
+
+                dom.eventInput = document.getElementById('eventInput');
+                dom.clearEventBtn = document.getElementById('clearEventBtn');
+                dom.presetEventBtns = document.querySelectorAll('.preset-btn');
+
+                dom.quickPointBtns = document.querySelectorAll('.quick-point-btn');
+                dom.pointsInput = document.getElementById('pointsInput');
+
+                dom.addPointsBtn = document.getElementById('addPointsBtn');
+                dom.deductPointsBtn = document.getElementById('deductPointsBtn');
+
+                dom.recordCountBadge = document.getElementById('recordCountBadge');
+                dom.filterTabs = document.querySelectorAll('.filter-tab');
+                dom.historyListContainer = document.getElementById('historyListContainer');
+
+                dom.resetModal = document.getElementById('resetModal');
+                dom.resetModalBox = document.getElementById('resetModalBox');
+                dom.closeResetModalIconBtn = document.getElementById('closeResetModalIconBtn');
+                dom.cancelResetBtn = document.getElementById('cancelResetBtn');
+                dom.resetConfirmForm = document.getElementById('resetConfirmForm');
+                dom.resetPasswordInput = document.getElementById('resetPasswordInput');
+                dom.resetErrorMsg = document.getElementById('resetErrorMsg');
+            }
+
+            /**
+             * 安全读取本地存储（带内存兜底）
+             */
+            function loadFromStorage() {
+                try {
+                    const raw = window.localStorage.getItem(STORAGE_KEY);
+                    if (raw) {
+                        const parsed = JSON.parse(raw);
+                        if (typeof parsed.totalPoints === 'number' && !isNaN(parsed.totalPoints)) {
+                            appState.totalPoints = parsed.totalPoints;
+                        }
+                        if (Array.isArray(parsed.history)) {
+                            appState.history = parsed.history;
+                        }
+                        return;
+                    }
+                } catch (err) {
+                    console.warn('localStorage 读取受限，使用内存模式:', err);
+                }
+
+                if (memoryFallbackData) {
+                    appState.totalPoints = memoryFallbackData.totalPoints;
+                    appState.history = memoryFallbackData.history;
+                }
+            }
+
+            /**
+             * 安全写入本地存储（带内存兜底）
+             */
+            function saveToStorage() {
+                const payload = {
+                    totalPoints: appState.totalPoints,
+                    history: appState.history
+                };
+                memoryFallbackData = JSON.parse(JSON.stringify(payload));
+                try {
+                    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+                } catch (err) {
+                    console.warn('localStorage 写入受限，已保存至当前会话内存:', err);
+                }
+            }
+
+            /**
+             * 获取今日日期前缀 YYYY-MM-DD
+             */
+            function getTodayDatePrefix() {
+                const now = new Date();
+                const pad = (n) => String(n).padStart(2, '0');
+                return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+            }
+
+            /**
+             * 格式化完整时间戳 YYYY-MM-DD HH:mm:ss
+             */
+            function formatDateTime(date) {
+                const pad = (n) => String(n).padStart(2, '0');
+                return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+            }
+
+            /**
+             * 转义 HTML 防止 XSS
+             */
+            function escapeHtml(str) {
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            }
+
+            /**
+             * 显示顶部轻提示 Toast
+             */
+            function showToast(message, type) {
+                const classMap = {
+                    success: 'toast-success',
+                    warning: 'toast-warning',
+                    error: 'toast-error',
+                    info: 'toast-info'
+                };
+
+                const iconMap = {
+                    success: '<polyline points="20 6 9 17 4 12"></polyline>',
+                    warning: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>',
+                    error: '<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>',
+                    info: '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line>'
+                };
+
+                const toastEl = document.createElement('div');
+                toastEl.className = `toast-item anim-slide ${classMap[type] || 'toast-info'}`;
+                toastEl.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+                        ${iconMap[type] || iconMap.info}
+                    </svg>
+                    <span>${escapeHtml(message)}</span>
+                `;
+
+                dom.toastContainer.appendChild(toastEl);
+
+                setTimeout(() => {
+                    toastEl.style.opacity = '0';
+                    toastEl.style.transform = 'translateY(-8px)';
+                    setTimeout(() => toastEl.remove(), 280);
+                }, 2500);
+            }
+
+            /**
+             * 控制事件输入框右侧清空按钮显隐
+             */
+            function updateClearBtnVisibility() {
+                if (dom.eventInput.value.trim().length > 0) {
+                    dom.clearEventBtn.classList.add('visible');
+                } else {
+                    dom.clearEventBtn.classList.remove('visible');
+                }
+            }
+
+            /**
+             * 更新常见事件快捷按钮的高亮选中状态
+             */
+            function updatePresetHighlight(currentValue) {
+                const trimmed = currentValue.trim();
+                dom.presetEventBtns.forEach((btn) => {
+                    const eventName = btn.getAttribute('data-event');
+                    if (eventName === trimmed) {
+                        btn.classList.add('active');
+                    } else {
+                        btn.classList.remove('active');
+                    }
+                });
+            }
+
+            /**
+             * 更新快捷积分档位（5 / 10 / 20）高亮状态
+             */
+            function updateQuickPointsHighlight(val) {
+                dom.quickPointBtns.forEach((btn) => {
+                    const btnVal = parseInt(btn.getAttribute('data-points'), 10);
+                    if (btnVal === val) {
+                        btn.classList.add('active');
+                    } else {
+                        btn.classList.remove('active');
+                    }
+                });
+            }
+
+            /**
+             * 执行增加或扣减积分操作
+             */
+            function executePointChange(type) {
+                const rawVal = parseInt(dom.pointsInput.value, 10);
+                if (isNaN(rawVal) || rawVal <= 0) {
+                    showToast('请输入大于 0 的有效正整数积分！', 'error');
+                    dom.pointsInput.focus();
+                    return;
+                }
+
+                let eventName = dom.eventInput.value.trim();
+                if (!eventName) {
+                    eventName = '日常积分调整';
+                }
+
+                const delta = type === 'add' ? rawVal : -rawVal;
+                const nextTotal = appState.totalPoints + delta;
+
+                const record = {
+                    id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+                    type: type,
+                    event: eventName,
+                    points: rawVal,
+                    balanceAfter: nextTotal,
+                    timestamp: formatDateTime(new Date())
+                };
+
+                appState.totalPoints = nextTotal;
+                appState.history.unshift(record);
+                saveToStorage();
+                renderAll(true);
+
+                const msg = type === 'add'
+                    ? `已增加 +${rawVal} 积分（${eventName}）`
+                    : `已扣减 -${rawVal} 积分（${eventName}）`;
+                showToast(msg, type === 'add' ? 'success' : 'warning');
+            }
+
+            /**
+             * 撤销单条历史记录并回滚总积分
+             */
+            function undoSingleRecord(recordId) {
+                const idx = appState.history.findIndex((item) => item.id === recordId);
+                if (idx === -1) return;
+
+                const target = appState.history[idx];
+                if (target.type === 'add') {
+                    appState.totalPoints -= target.points;
+                } else {
+                    appState.totalPoints += target.points;
+                }
+
+                appState.history.splice(idx, 1);
+                saveToStorage();
+                renderAll(true);
+                showToast(`已撤销「${target.event}」并回滚积分`, 'info');
+            }
+
+            /**
+             * 渲染顶部概览看板（当前总积分、今日获得与今日扣减统计）
+             */
+            function renderOverview(animate) {
+                dom.totalPointsDisplay.textContent = appState.totalPoints;
+
+                if (animate) {
+                    dom.totalPointsDisplay.classList.remove('anim-pop');
+                    void dom.totalPointsDisplay.offsetWidth;
+                    dom.totalPointsDisplay.classList.add('anim-pop');
+                }
+
+                const todayPrefix = getTodayDatePrefix();
+                let todayAdded = 0;
+                let todayDeducted = 0;
+
+                appState.history.forEach((item) => {
+                    if (item.timestamp && item.timestamp.startsWith(todayPrefix)) {
+                        if (item.type === 'add') {
+                            todayAdded += item.points;
+                        } else if (item.type === 'deduct') {
+                            todayDeducted += item.points;
+                        }
+                    }
+                });
+
+                dom.todayAddedDisplay.textContent = `+${todayAdded}`;
+                dom.todayDeductedDisplay.textContent = `-${todayDeducted}`;
+            }
+
+            /**
+             * 渲染操作历史流水列表
+             */
+            function renderHistoryList() {
+                const filtered = appState.history.filter((item) => {
+                    if (appState.currentFilter === 'all') return true;
+                    return item.type === appState.currentFilter;
+                });
+
+                dom.recordCountBadge.textContent = `${filtered.length} 条`;
+
+                if (filtered.length === 0) {
+                    const emptyTip = appState.history.length === 0
+                        ? '暂无任何积分操作记录，快在上方录入第一笔积分吧！'
+                        : '当前筛选条件下暂无匹配记录';
+
+                    dom.historyListContainer.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-icon">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                </svg>
+                            </div>
+                            <p class="empty-text">${emptyTip}</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                dom.historyListContainer.innerHTML = filtered.map((item) => {
+                    const isAdd = item.type === 'add';
+                    const typeClass = isAdd ? 'add' : 'deduct';
+                    const typeLabel = isAdd ? '增加' : '扣减';
+                    const sign = isAdd ? '+' : '-';
+
+                    return `
+                        <div class="history-item anim-slide">
+                            <div class="history-left">
+                                <span class="type-pill ${typeClass}">${typeLabel}</span>
+                                <div class="history-info">
+                                    <div class="history-event">${escapeHtml(item.event)}</div>
+                                    <div class="history-meta">
+                                        <span>${escapeHtml(item.timestamp)}</span>
+                                        <span>剩余总积分: <strong>${item.balanceAfter}</strong></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="history-right">
+                                <span class="history-delta ${typeClass}">${sign}${item.points} <small>积分</small></span>
+                                <button type="button" class="btn-undo" data-undo-id="${escapeHtml(item.id)}">撤销</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            /**
+             * 统一刷新界面
+             */
+            function renderAll(animate) {
+                renderOverview(animate);
+                renderHistoryList();
+            }
+
+            /**
+             * 打开重置积分二次确认弹窗
+             */
+            function openResetModal() {
+                dom.resetPasswordInput.value = '';
+                dom.resetErrorMsg.classList.remove('visible');
+                dom.resetPasswordInput.classList.remove('error');
+                dom.resetModal.classList.add('open');
+                setTimeout(() => dom.resetPasswordInput.focus(), 60);
+            }
+
+            /**
+             * 关闭重置积分弹窗
+             */
+            function closeResetModal() {
+                dom.resetModal.classList.remove('open');
+            }
+
+            /**
+             * 验证重置密码并执行清零
+             */
+            function handleResetSubmit(e) {
+                e.preventDefault();
+                const inputPwd = dom.resetPasswordInput.value.trim();
+
+                if (inputPwd !== RESET_PASSWORD) {
+                    dom.resetErrorMsg.classList.add('visible');
+                    dom.resetPasswordInput.classList.add('error');
+                    dom.resetModalBox.classList.remove('anim-shake');
+                    void dom.resetModalBox.offsetWidth;
+                    dom.resetModalBox.classList.add('anim-shake');
+                    dom.resetPasswordInput.value = '';
+                    dom.resetPasswordInput.focus();
+                    return;
+                }
+
+                appState.totalPoints = 0;
+                appState.history = [];
+                saveToStorage();
+                renderAll(true);
+                closeResetModal();
+                showToast('密码验证通过，所有积分与历史记录已清零！', 'success');
+            }
+
+            /**
+             * 绑定所有交互事件
+             */
+            function bindEvents() {
+                // 1. 常见事件快捷填充按钮
+                dom.presetEventBtns.forEach((btn) => {
+                    btn.addEventListener('click', () => {
+                        const eventName = btn.getAttribute('data-event');
+                        dom.eventInput.value = eventName;
+                        updateClearBtnVisibility();
+                        updatePresetHighlight(eventName);
+                    });
+                });
+
+                // 2. 事件输入框与清空按钮
+                dom.eventInput.addEventListener('input', () => {
+                    updateClearBtnVisibility();
+                    updatePresetHighlight(dom.eventInput.value);
+                });
+
+                dom.clearEventBtn.addEventListener('click', () => {
+                    dom.eventInput.value = '';
+                    updateClearBtnVisibility();
+                    updatePresetHighlight('');
+                    dom.eventInput.focus();
+                });
+
+                // 3. 快捷积分档位（5 / 10 / 20）
+                dom.quickPointBtns.forEach((btn) => {
+                    btn.addEventListener('click', () => {
+                        const pts = parseInt(btn.getAttribute('data-points'), 10);
+                        dom.pointsInput.value = pts;
+                        updateQuickPointsHighlight(pts);
+                    });
+                });
+
+                // 4. 手动输入积分同步高亮
+                dom.pointsInput.addEventListener('input', () => {
+                    const pts = parseInt(dom.pointsInput.value, 10);
+                    updateQuickPointsHighlight(pts);
+                });
+
+                // 5. 增加积分 & 扣减积分主按钮
+                dom.addPointsBtn.addEventListener('click', () => executePointChange('add'));
+                dom.deductPointsBtn.addEventListener('click', () => executePointChange('deduct'));
+
+                // 6. 流水筛选标签切换
+                dom.filterTabs.forEach((tab) => {
+                    tab.addEventListener('click', () => {
+                        const filter = tab.getAttribute('data-filter');
+                        appState.currentFilter = filter;
+                        dom.filterTabs.forEach((t) => {
+                            t.classList.toggle('active', t.getAttribute('data-filter') === filter);
+                        });
+                        renderHistoryList();
+                    });
+                });
+
+                // 7. 历史列表事件委托：单条撤销
+                dom.historyListContainer.addEventListener('click', (e) => {
+                    const undoBtn = e.target.closest('.btn-undo');
+                    if (undoBtn) {
+                        const recordId = undoBtn.getAttribute('data-undo-id');
+                        undoSingleRecord(recordId);
+                    }
+                });
+
+                // 8. 重置积分弹窗交互
+                dom.openResetModalBtn.addEventListener('click', openResetModal);
+                dom.closeResetModalIconBtn.addEventListener('click', closeResetModal);
+                dom.cancelResetBtn.addEventListener('click', closeResetModal);
+                dom.resetConfirmForm.addEventListener('submit', handleResetSubmit);
+
+                dom.resetModal.addEventListener('click', (e) => {
+                    if (e.target === dom.resetModal) {
+                        closeResetModal();
+                    }
+                });
+
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' && dom.resetModal.classList.contains('open')) {
+                        closeResetModal();
+                    }
+                });
+            }
+
+            // 启动应用
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => {
+                    cacheDOM();
+                    loadFromStorage();
+                    bindEvents();
+                    renderAll(false);
+                });
+            } else {
+                cacheDOM();
+                loadFromStorage();
+                bindEvents();
+                renderAll(false);
+            }
+        })();
+    </script>
+</body>
+</html>

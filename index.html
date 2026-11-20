@@ -95,6 +95,20 @@
       margin-top: 2px;
     }
 
+    .user-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      background: #eff6ff;
+      color: var(--blue-start);
+      border: 1px solid #bfdbfe;
+      cursor: pointer;
+    }
+
     .sync-badge {
       display: inline-flex;
       align-items: center;
@@ -287,6 +301,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      flex-wrap: wrap;
       gap: 10px;
     }
 
@@ -504,7 +519,16 @@
       background: var(--red-dark);
     }
 
-    /* 流水列表 */
+    /* 流水筛选与列表 */
+    .filter-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
     .filter-pills {
       display: inline-flex;
       background: #f1f5f9;
@@ -526,6 +550,22 @@
       background: #ffffff;
       color: var(--blue-start);
       box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+    }
+
+    .operator-filter-select {
+      padding: 6px 10px;
+      border-radius: 9px;
+      border: 1.5px solid #cbd5e1;
+      background: #ffffff;
+      color: #1e293b;
+      font-size: 12px;
+      font-weight: 600;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .operator-filter-select:focus {
+      border-color: var(--blue-start);
     }
 
     .count-pill {
@@ -684,6 +724,34 @@
       margin-bottom: 12px;
     }
 
+    .quick-users {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .quick-user-btn {
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      background: #f1f5f9;
+      color: #334155;
+      border: 1.5px solid #cbd5e1;
+    }
+
+    .quick-user-btn:hover {
+      background: #e2e8f0;
+    }
+
+    .quick-user-btn.active {
+      background: var(--blue-start);
+      color: #ffffff;
+      border-color: var(--blue-start);
+      box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+    }
+
     .modal-footer {
       display: flex;
       justify-content: flex-end;
@@ -733,6 +801,7 @@
         <div>
           <h1 class="brand-title">积分记录与管理</h1>
           <div class="brand-sub">
+            <span id="userChip" class="user-chip" title="点击切换操作人">操作人：未登录</span>
             <span id="modeDesc">每一分成长清晰可见♡❤♡</span>
             <span id="syncBadge" class="sync-badge">连接中...</span>
           </div>
@@ -740,6 +809,7 @@
       </div>
 
       <div class="topbar-actions">
+        <button type="button" id="openUserBtn" class="btn-secondary">登录/切换操作人</button>
         <button type="button" id="openCloudBtn" class="btn-secondary">切换账本/配置</button>
         <button type="button" id="syncNowBtn" class="btn-secondary">立即同步</button>
         <button type="button" id="openResetBtn" class="btn-reset">
@@ -898,17 +968,47 @@
             <span>操作历史流水</span>
             <span id="historyCountBadge" class="count-pill">0 条</span>
           </span>
+        </div>
 
+        <div class="filter-toolbar">
           <div class="filter-pills" role="tablist">
             <button type="button" class="filter-btn active" data-filter="all">全部记录</button>
             <button type="button" class="filter-btn" data-filter="add">仅看增加</button>
             <button type="button" class="filter-btn" data-filter="sub">仅看扣减</button>
           </div>
+
+          <select id="operatorFilterSelect" class="operator-filter-select" aria-label="按操作人筛选">
+            <option value="ALL">全部操作人</option>
+          </select>
         </div>
 
         <div id="historyList" class="history-list"></div>
       </section>
     </main>
+  </div>
+
+  <!-- 登录/切换操作人弹窗（仅本地保存） -->
+  <div id="userModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="userModalTitle">
+    <div class="modal-card">
+      <h3 id="userModalTitle" class="modal-title">登录 / 切换操作人</h3>
+      <p class="modal-desc">操作人信息仅保存在本机浏览器中，记录积分时会自动写入历史流水方便查看。</p>
+
+      <label class="field-label">快捷选择</label>
+      <div class="quick-users" id="quickUsersContainer">
+        <button type="button" class="quick-user-btn" data-user="Bill">Bill</button>
+        <button type="button" class="quick-user-btn" data-user="Amy">Amy</button>
+      </div>
+
+      <div class="modal-field">
+        <label for="userNameInput" class="field-label">当前操作人</label>
+        <input id="userNameInput" type="text" class="text-input" placeholder="点击上方 Bill / Amy 或输入名称" maxlength="20" />
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="cancelUserBtn" class="btn-secondary">取消</button>
+        <button type="button" id="saveUserBtn" class="btn-add">确认登录</button>
+      </div>
+    </div>
   </div>
 
   <!-- 重置密码二次确认弹窗 -->
@@ -961,21 +1061,24 @@
     (function () {
       const STORAGE_DATA_KEY = "points_manager_state_v1";
       const STORAGE_CLOUD_KEY = "points_manager_supabase_cfg_v1";
+      const STORAGE_USER_KEY = "points_manager_local_user_v1";
       const RESET_PASSWORD = "0611";
       const TABLE_NAME = "points_ledger";
+      const QUICK_USERS = ["Bill", "Amy"];
 
       // ==========================================
-      // 👇 默认云端配置区（已为您预填 URL 与编码）
+      // 👇 默认云端配置区
       // ==========================================
       const DEFAULT_CLOUD_CONFIG = {
         url: "https://ujxzwhkvcainlzvvzsfo.supabase.co",
-        key: "sb_publishable_1kEH5fUmX3ZULfeuVTW_0w_jHR2bM6-", // <-- 请把引号内的中文替换为完整的密钥字符串
+        key: "sb_publishable_1kEH5fUmX3ZULfeuVTW_0w_jHR2bM6-",
         roomId: "Amy_0813"
       };
       // ==========================================
 
       let memoryDataRaw = null;
       let memoryCloudRaw = null;
+      let memoryUserRaw = null;
 
       function readStorage(key, fallbackRaw) {
         try {
@@ -986,9 +1089,10 @@
         }
       }
 
-      function writeStorage(key, val, isData) {
-        if (isData) memoryDataRaw = val;
-        else memoryCloudRaw = val;
+      function writeStorage(key, val, mode) {
+        if (mode === "data") memoryDataRaw = val;
+        else if (mode === "cloud") memoryCloudRaw = val;
+        else if (mode === "user") memoryUserRaw = val;
         try {
           window.localStorage.setItem(key, val);
         } catch (_) {}
@@ -1001,8 +1105,10 @@
       };
 
       let cloudConfig = { ...DEFAULT_CLOUD_CONFIG };
+      let currentUser = "";
 
       let currentFilter = "all";
+      let currentOperatorFilter = "ALL";
       let cloudConnected = false;
       let pollTimer = null;
 
@@ -1014,8 +1120,14 @@
       const pointsInput = document.getElementById("pointsInput");
       const historyList = document.getElementById("historyList");
       const historyCountBadge = document.getElementById("historyCountBadge");
+      const operatorFilterSelect = document.getElementById("operatorFilterSelect");
       const syncBadge = document.getElementById("syncBadge");
       const modeDesc = document.getElementById("modeDesc");
+      const userChip = document.getElementById("userChip");
+
+      const userModal = document.getElementById("userModal");
+      const userNameInput = document.getElementById("userNameInput");
+      const quickUserButtons = Array.from(document.querySelectorAll(".quick-user-btn"));
 
       const resetModal = document.getElementById("resetModal");
       const resetModalCard = document.getElementById("resetModalCard");
@@ -1038,6 +1150,30 @@
         }, 2600);
       }
 
+      // 纯本地读取/保存操作人
+      function loadLocalUser() {
+        const raw = readStorage(STORAGE_USER_KEY, memoryUserRaw);
+        currentUser = (raw || "").trim();
+        renderUserChip();
+      }
+
+      function saveLocalUser(name) {
+        currentUser = (name || "").trim();
+        writeStorage(STORAGE_USER_KEY, currentUser, "user");
+        renderUserChip();
+      }
+
+      function renderUserChip() {
+        userChip.textContent = currentUser ? "操作人：" + currentUser : "操作人：未登录";
+      }
+
+      function ensureOperatorLoggedIn() {
+        if (currentUser) return currentUser;
+        openUserModal();
+        showToast("请先登录或选择操作人（Bill / Amy）");
+        return null;
+      }
+
       function loadLocalState() {
         const raw = readStorage(STORAGE_DATA_KEY, memoryDataRaw);
         if (!raw) return;
@@ -1051,7 +1187,7 @@
 
       function saveLocalState() {
         state.updatedAt = new Date().toISOString();
-        writeStorage(STORAGE_DATA_KEY, JSON.stringify(state), true);
+        writeStorage(STORAGE_DATA_KEY, JSON.stringify(state), "data");
       }
 
       function loadCloudConfig() {
@@ -1067,12 +1203,11 @@
             }
           } catch (_) {}
         }
-        // 如果本地缓存没有有效的配置，直接使用代码里写死的默认配置
         cloudConfig = { ...DEFAULT_CLOUD_CONFIG };
       }
 
       function saveCloudConfig() {
-        writeStorage(STORAGE_CLOUD_KEY, JSON.stringify(cloudConfig), false);
+        writeStorage(STORAGE_CLOUD_KEY, JSON.stringify(cloudConfig), "cloud");
       }
 
       function hasCloudConfig() {
@@ -1117,6 +1252,31 @@
         return `${m}-${d} ${hh}:${mm}:${ss}`;
       }
 
+      function syncOperatorFilterOptions() {
+        const nameSet = new Set(QUICK_USERS);
+        let hasUnrecorded = false;
+        for (const item of state.history) {
+          const op = (item.operator || "").trim();
+          if (op) nameSet.add(op);
+          else hasUnrecorded = true;
+        }
+
+        const options = ['<option value="ALL">全部操作人</option>'];
+        for (const name of nameSet) {
+          options.push(`<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`);
+        }
+        if (hasUnrecorded) {
+          options.push('<option value="__NONE__">未记录操作人</option>');
+        }
+        operatorFilterSelect.innerHTML = options.join("");
+
+        const validValues = new Set(["ALL", ...nameSet, ...(hasUnrecorded ? ["__NONE__"] : [])]);
+        if (!validValues.has(currentOperatorFilter)) {
+          currentOperatorFilter = "ALL";
+        }
+        operatorFilterSelect.value = currentOperatorFilter;
+      }
+
       function renderAll(bumpScore) {
         totalPointsEl.textContent = String(state.totalPoints);
         if (bumpScore) {
@@ -1139,9 +1299,19 @@
         todayGainEl.textContent = "+" + gain;
         todayLossEl.textContent = "-" + loss;
 
+        syncOperatorFilterOptions();
+
         const filtered = state.history.filter((item) => {
-          if (currentFilter === "add") return item.type === "add";
-          if (currentFilter === "sub") return item.type === "sub";
+          if (currentFilter === "add" && item.type !== "add") return false;
+          if (currentFilter === "sub" && item.type !== "sub") return false;
+
+          const op = (item.operator || "").trim();
+          if (currentOperatorFilter === "__NONE__") {
+            return !op;
+          }
+          if (currentOperatorFilter !== "ALL") {
+            return op === currentOperatorFilter;
+          }
           return true;
         });
 
@@ -1156,7 +1326,7 @@
                   <polyline points="14 2 14 8 20 8"></polyline>
                 </svg>
               </div>
-              <div>暂无积分操作记录，快在左侧录入第一笔积分吧！</div>
+              <div>暂无符合条件的积分操作记录</div>
             </div>
           `;
           return;
@@ -1167,12 +1337,13 @@
             const isAdd = item.type === "add";
             const sign = isAdd ? "+" : "-";
             const badgeClass = isAdd ? "plus" : "minus";
+            const opText = item.operator ? `操作人：${item.operator}` : "操作人：未记录";
             const afterVal = item.balanceAfter !== undefined ? ` · 余额 ${item.balanceAfter}` : "";
             return `
               <div class="history-item" data-id="${escapeHtml(item.id)}">
                 <div class="history-left">
                   <div class="history-event">${escapeHtml(item.event || "未命名事件")}</div>
-                  <div class="history-meta">${escapeHtml(formatTime(item.createdAt))}${escapeHtml(afterVal)}</div>
+                  <div class="history-meta">${escapeHtml(opText)} · ${escapeHtml(formatTime(item.createdAt))}${escapeHtml(afterVal)}</div>
                 </div>
                 <div class="history-right">
                   <span class="delta-badge ${badgeClass}">${sign}${Number(item.points) || 0}</span>
@@ -1290,6 +1461,9 @@
       }
 
       async function handleRecord(type) {
+        const operator = ensureOperatorLoggedIn();
+        if (!operator) return;
+
         const pts = getInputPoints();
         if (pts === null) return;
 
@@ -1302,6 +1476,7 @@
           type,
           event: desc,
           points: pts,
+          operator,
           balanceAfter: nextTotal,
           createdAt: new Date().toISOString()
         };
@@ -1311,7 +1486,7 @@
         saveLocalState();
         renderAll(true);
 
-        showToast((type === "add" ? "已增加 " : "已扣减 ") + pts + " 积分");
+        showToast(`${operator} ${(type === "add" ? "增加 " : "扣减 ")}${pts} 积分`);
 
         if (hasCloudConfig()) {
           await pushToCloud(true);
@@ -1319,6 +1494,9 @@
       }
 
       async function handleUndo(id) {
+        const operator = ensureOperatorLoggedIn();
+        if (!operator) return;
+
         const idx = state.history.findIndex((item) => item.id === id);
         if (idx === -1) return;
         const target = state.history[idx];
@@ -1327,12 +1505,66 @@
         state.history.splice(idx, 1);
         saveLocalState();
         renderAll(true);
-        showToast("已撤销该条积分记录");
+        showToast(`${operator} 已撤销该条记录`);
 
         if (hasCloudConfig()) {
           await pushToCloud(true);
         }
       }
+
+      // 操作人登录弹窗（仅本地保存）
+      function syncQuickUserButtons(activeName) {
+        quickUserButtons.forEach((btn) => {
+          btn.classList.toggle("active", btn.getAttribute("data-user") === activeName);
+        });
+      }
+
+      function openUserModal() {
+        userNameInput.value = currentUser;
+        syncQuickUserButtons(currentUser);
+        userModal.classList.add("open");
+        setTimeout(() => userNameInput.focus(), 50);
+      }
+
+      document.getElementById("openUserBtn").addEventListener("click", openUserModal);
+      userChip.addEventListener("click", openUserModal);
+
+      document.getElementById("cancelUserBtn").addEventListener("click", () => {
+        userModal.classList.remove("open");
+      });
+
+      userModal.addEventListener("click", (e) => {
+        if (e.target === userModal) userModal.classList.remove("open");
+      });
+
+      quickUserButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const name = btn.getAttribute("data-user") || "";
+          userNameInput.value = name;
+          syncQuickUserButtons(name);
+        });
+      });
+
+      userNameInput.addEventListener("input", () => {
+        syncQuickUserButtons(userNameInput.value.trim());
+      });
+
+      function confirmUserLogin() {
+        const name = userNameInput.value.trim();
+        if (!name) {
+          showToast("请选择 Bill / Amy 或输入操作人名称");
+          userNameInput.focus();
+          return;
+        }
+        saveLocalUser(name);
+        userModal.classList.remove("open");
+        showToast("当前操作人已设为：" + name);
+      }
+
+      document.getElementById("saveUserBtn").addEventListener("click", confirmUserLogin);
+      userNameInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") confirmUserLogin();
+      });
 
       // 快捷事件按钮绑定
       const presetButtons = Array.from(document.querySelectorAll(".preset-btn"));
@@ -1375,6 +1607,7 @@
       document.getElementById("addPointsBtn").addEventListener("click", () => handleRecord("add"));
       document.getElementById("subPointsBtn").addEventListener("click", () => handleRecord("sub"));
 
+      // 流水类型与操作人筛选
       const filterButtons = Array.from(document.querySelectorAll(".filter-btn"));
       filterButtons.forEach((btn) => {
         btn.addEventListener("click", () => {
@@ -1382,6 +1615,11 @@
           filterButtons.forEach((b) => b.classList.toggle("active", b === btn));
           renderAll(false);
         });
+      });
+
+      operatorFilterSelect.addEventListener("change", () => {
+        currentOperatorFilter = operatorFilterSelect.value;
+        renderAll(false);
       });
 
       historyList.addEventListener("click", (e) => {
@@ -1393,6 +1631,8 @@
 
       // 重置积分弹窗
       document.getElementById("openResetBtn").addEventListener("click", () => {
+        const operator = ensureOperatorLoggedIn();
+        if (!operator) return;
         resetPasswordInput.value = "";
         resetModal.classList.add("open");
         setTimeout(() => resetPasswordInput.focus(), 50);
@@ -1407,6 +1647,9 @@
       });
 
       async function confirmResetPoints() {
+        const operator = ensureOperatorLoggedIn();
+        if (!operator) return;
+
         const pwd = resetPasswordInput.value.trim();
         if (pwd !== RESET_PASSWORD) {
           resetModalCard.classList.remove("shake");
@@ -1418,11 +1661,21 @@
         }
 
         state.totalPoints = 0;
-        state.history = [];
+        state.history = [
+          {
+            id: "reset_" + Date.now(),
+            type: "sub",
+            event: "重置所有积分",
+            points: 0,
+            operator,
+            balanceAfter: 0,
+            createdAt: new Date().toISOString()
+          }
+        ];
         saveLocalState();
         renderAll(true);
         resetModal.classList.remove("open");
-        showToast("已重置所有积分并清空流水");
+        showToast(`${operator} 已重置所有积分`);
 
         if (hasCloudConfig()) {
           await pushToCloud(true);
@@ -1488,9 +1741,14 @@
       });
 
       // 初始化
+      loadLocalUser();
       loadLocalState();
       loadCloudConfig();
       renderAll(false);
+
+      if (!currentUser) {
+        openUserModal();
+      }
 
       if (hasCloudConfig()) {
         pullFromCloud(true);
